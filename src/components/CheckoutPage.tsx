@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Lock, Loader2, Clock, CircleCheck, ExternalLink, Sparkles, ShieldCheck, Check, ArrowRight, RotateCcw, Copy, Radio, ArrowUpRight } from 'lucide-react'
-import { useCheckoutSession } from '../lib/api'
+import { Lock, Loader2, Clock, CircleCheck, ExternalLink, Sparkles, ShieldCheck, Check, ArrowRight, RotateCcw, Copy, Radio, ArrowUpRight, AlertTriangle } from 'lucide-react'
+import { useCheckoutSession, selectNetwork } from '../lib/api'
 import { USE_MOCK, getMockAddress } from '../lib/mock'
 import { copyToClipboard, formatAmount } from '../lib/format'
 import type { CheckoutSessionPublic, Currency, NetworkCode } from '../lib/types'
@@ -44,17 +44,30 @@ export function CheckoutPage({ token }: { token: string }) {
   const [emailTouched, setEmailTouched] = useState(false)
   const [simulatedTx, setSimulatedTx] = useState<{ txHash: string; network: NetworkCode; confirmedAt: string } | null>(null)
 
+  const initialized = useRef(false)
+
+  // Reset initialization when token changes
   useEffect(() => {
-    if (!session) return
+    initialized.current = false
+  }, [token])
+
+  // Hydrate initial currency, network, and email from session only ONCE
+  useEffect(() => {
+    if (!session || initialized.current) return
+    initialized.current = true
     setCurrency(session.currency)
     if (session.customerEmail) setCustomerEmail(session.customerEmail)
     const first = session.networks.find((n) => n.currency === session.currency)?.networks[0]
     if (first) setNetwork(first.code)
-    if (session.status === 'paid' && session.payment) {
+  }, [session])
+
+  // React to on-chain paid status from server without resetting user selections
+  useEffect(() => {
+    if (session?.status === 'paid' && session.payment) {
       setFlowState('paid')
       setSimulatedTx(session.payment)
     }
-  }, [session])
+  }, [session?.status, session?.payment])
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)
   const showEmailError = emailTouched && !emailValid
@@ -86,7 +99,15 @@ export function CheckoutPage({ token }: { token: string }) {
   const handleCurrency = (c: Currency) => {
     setCurrency(c)
     const first = session.networks.find((n) => n.currency === c)?.networks[0]
-    if (first) setNetwork(first.code)
+    if (first) {
+      setNetwork(first.code)
+      selectNetwork(token, c, first.code).catch(() => {})
+    }
+  }
+
+  const handleNetwork = (n: NetworkCode) => {
+    setNetwork(n)
+    selectNetwork(token, currency, n).catch(() => {})
   }
 
   const handleInitiatePayment = () => {
@@ -119,18 +140,20 @@ export function CheckoutPage({ token }: { token: string }) {
     <div className="min-h-screen bg-white text-[#1a1f36] font-body antialiased">
       <CheckoutSEO session={session} status={seoStatus} />
       {/* 2-Column Responsive Layout */}
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-12 items-stretch overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-12 lg:min-h-screen lg:items-stretch overflow-hidden">
         {/* Left Column: Order Summary */}
-        <div className="lg:col-span-6 flex flex-col bg-[#f8f9fa] min-h-full">
+        <div className="lg:col-span-6 flex flex-col bg-[#f8f9fa]">
           <OrderSummaryPanel
             session={session}
             totals={totals}
             currency={currency}
+            network={network}
+            address={address}
           />
         </div>
 
         {/* Right Column: Framer Motion Step Container */}
-        <div className="lg:col-span-6 flex flex-col justify-between bg-white px-6 py-8 sm:px-12 lg:px-16 lg:py-14 min-h-full relative z-10 shadow-[-6px_0_25px_-5px_rgba(0,0,0,0.05)]">
+        <div className="lg:col-span-6 flex flex-col justify-between bg-white px-5 py-6 sm:px-12 lg:px-16 lg:py-14 lg:min-h-full relative z-10 shadow-[-6px_0_25px_-5px_rgba(0,0,0,0.05)] border-t border-[#e6e8eb] lg:border-t-0">
           <AnimatePresence mode="wait">
             <motion.div
               key={status === 'paid' ? 'paid' : flowState === 'awaiting_confirmation' ? 'awaiting' : status}
@@ -138,7 +161,7 @@ export function CheckoutPage({ token }: { token: string }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -12, scale: 0.98 }}
               transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-              className="mx-auto w-full max-w-md space-y-7"
+              className="mx-auto w-full max-w-md space-y-6 sm:space-y-7"
             >
               {status === 'paid' ? (
                 <>
@@ -188,7 +211,7 @@ export function CheckoutPage({ token }: { token: string }) {
                     network={network}
                     countdownMs={countdownMs}
                     onCurrency={handleCurrency}
-                    onNetwork={setNetwork}
+                    onNetwork={handleNetwork}
                   />
 
                   <div className="space-y-3 pt-2">
@@ -207,6 +230,14 @@ export function CheckoutPage({ token }: { token: string }) {
                         toast.error('Please enter a valid email address')
                       }}
                     />
+
+                    {/* One-time address disclaimer */}
+                    <div className="flex items-start gap-2.5 rounded-xl bg-amber-50/80 border border-amber-200/70 p-3 text-left">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                      <p className="text-xs leading-relaxed text-amber-900/90">
+                        <strong className="font-semibold text-amber-950">One-time deposit address.</strong> Send the exact amount in a single transaction. Any payment that does not match the amount or is sent after expiry will be lost and cannot be reversed.
+                      </p>
+                    </div>
 
                     {USE_MOCK && (
                       <button
