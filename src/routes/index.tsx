@@ -8,7 +8,7 @@ export const Route = createFileRoute('/')({
 
 const demos = [
   { token: 'demo', label: 'Product Checkout (USDC)', desc: 'Standard e-commerce checkout session with product item', tag: 'Live Session' },
-  { token: 'invoice', label: 'Invoice Payment (USDT)', desc: 'B2B invoice checkout session with merchant-paid fee', tag: 'Invoice' },
+  { token: 'invoice', label: 'Invoice Payment (₦650,000 NGN → USDT)', desc: 'Fiat B2B invoice — line items, locked rate, merchant branding', tag: 'Invoice' },
   { token: 'paid', label: 'Payment Confirmation', desc: 'Instant transaction receipt & verified payment success state', tag: 'Success' },
   { token: 'expired', label: 'Expired Checkout Session', desc: 'Expired payment link state with retry merchant prompt', tag: 'Expired' },
 ]

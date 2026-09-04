@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Lock, Loader2, Clock, CircleCheck, ExternalLink, Sparkles, ShieldCheck, Check, ArrowRight, RotateCcw, Copy, Radio, ArrowUpRight, AlertTriangle } from 'lucide-react'
 import { useCheckoutSession, selectNetwork } from '../lib/api'
 import { USE_MOCK, getMockAddress } from '../lib/mock'
+import { useMerchantBranding } from '../lib/branding'
 import { copyToClipboard, formatAmount } from '../lib/format'
 import type { CheckoutSessionPublic, Currency, NetworkCode } from '../lib/types'
 import { CustomerInfo } from './CustomerInfo'
@@ -37,6 +38,7 @@ function totalFor(session: CheckoutSessionPublic): { total: string; feeAmount: s
 
 export function CheckoutPage({ token }: { token: string }) {
   const { data: session, isLoading, error } = useCheckoutSession(token)
+  useMerchantBranding(session?.merchant.branding)
   const [currency, setCurrency] = useState<Currency>('USDC')
   const [network, setNetwork] = useState<NetworkCode>('ethereum')
   const [flowState, setFlowState] = useState<PaymentFlowState>('idle')
@@ -245,7 +247,7 @@ export function CheckoutPage({ token }: { token: string }) {
                         onClick={handleInitiatePayment}
                         className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#d8dee4] bg-[#f8f9fa] py-2.5 text-xs font-semibold text-[#687385] btn-press hover:bg-white hover:text-[#1a1f36] hover:border-[#a3acb9] transition-all"
                       >
-                        <Sparkles className="h-3.5 w-3.5 text-[#d65a84]" />
+                        <Sparkles className="h-3.5 w-3.5 text-(--merchant-accent)" />
                         Simulate payment flow (Demo)
                       </button>
                     )}
@@ -255,7 +257,7 @@ export function CheckoutPage({ token }: { token: string }) {
             </motion.div>
           </AnimatePresence>
 
-          <FooterBranding />
+          <FooterBranding supportEmail={session.merchant.branding?.supportEmail} />
         </div>
       </div>
     </div>
@@ -363,7 +365,7 @@ function AwaitingConfirmationCard({
           onClick={onConfirm}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2C1047] py-3.5 px-6 font-display text-sm font-bold text-white shadow-md btn-press hover:bg-[#3e1e68] transition-all"
         >
-          <Sparkles className="h-4 w-4 text-[#d65a84]" />
+          <Sparkles className="h-4 w-4 text-(--merchant-accent)" />
           <span>Simulate Instant Confirmation (Demo)</span>
         </button>
 
@@ -447,6 +449,12 @@ function SuccessCard({
         A receipt confirmation has been sent to <strong className="text-[#4f5666]">{customerEmail || session.customerEmail || 'your email'}</strong>.
       </p>
 
+      {session.merchant.branding?.receiptMessage && (
+        <p className="rounded-xl border border-[#e6e8eb] bg-[#f8f9fa] px-4 py-3 text-center text-xs text-[#687385] leading-relaxed">
+          {session.merchant.branding.receiptMessage}
+        </p>
+      )}
+
       <button
         type="button"
         onClick={() => toast.info('Returning to merchant website')}
@@ -460,6 +468,7 @@ function SuccessCard({
 }
 
 function ExpiredCard({ session }: { session: CheckoutSessionPublic }) {
+  const supportEmail = session.merchant.branding?.supportEmail
   return (
     <div className="space-y-6 text-center">
       <div className="flex flex-col items-center space-y-3">
@@ -474,7 +483,10 @@ function ExpiredCard({ session }: { session: CheckoutSessionPublic }) {
 
       <button
         type="button"
-        onClick={() => toast.info('Contact merchant to request new payment link')}
+        onClick={() => {
+          if (supportEmail) window.location.href = `mailto:${supportEmail}`
+          else toast.info('Contact merchant to request new payment link')
+        }}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2C1047] py-3.5 px-6 font-display text-sm font-bold text-white shadow-md btn-press hover:bg-[#3e1e68] transition-all"
       >
         <span>Contact {session.merchant.name}</span>
@@ -527,7 +539,7 @@ function StateShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-function FooterBranding() {
+function FooterBranding({ supportEmail }: { supportEmail?: string }) {
   return (
     <div className="flex items-center justify-center gap-2 text-xs text-[#8792a2] pt-4">
       <span className="text-[#687385]">Powered by</span>
@@ -535,6 +547,14 @@ function FooterBranding() {
       <span className="mx-1 text-[#d8dee4]">|</span>
       <a href="#" className="hover:text-[#1a1f36] transition-colors">Terms</a>
       <a href="#" className="hover:text-[#1a1f36] transition-colors">Privacy</a>
+      {supportEmail && (
+        <>
+          <span className="mx-1 text-[#d8dee4]">|</span>
+          <a href={`mailto:${supportEmail}`} className="hover:text-[#1a1f36] transition-colors">
+            Support
+          </a>
+        </>
+      )}
     </div>
   )
 }
@@ -576,12 +596,12 @@ function PayActionButton({
     >
       {loading ? (
         <>
-          <Loader2 className="h-4 w-4 animate-spin text-[#d65a84]" />
+          <Loader2 className="h-4 w-4 animate-spin text-(--merchant-accent)" />
           <span>Processing Payment…</span>
         </>
       ) : (
         <>
-          <ShieldCheck className="h-4 w-4 text-[#d65a84] transition-transform duration-200 group-hover:scale-110" />
+          <ShieldCheck className="h-4 w-4 text-(--merchant-accent) transition-transform duration-200 group-hover:scale-110" />
           <span>Pay {amount} {currency}</span>
         </>
       )}

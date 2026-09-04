@@ -26,6 +26,12 @@ export const mockSession: CheckoutSessionPublic = {
   merchant: {
     name: 'Aurora Studio',
     accent: '#d65a84',
+    branding: {
+      logoUrl: '/logo.svg',
+      accentColor: '#d65a84',
+      supportEmail: 'support@aurorastudio.io',
+      receiptMessage: 'Thanks for supporting Aurora Studio! Your access is being provisioned now.',
+    },
   },
   product: {
     name: 'Lumen Pro — Annual',
@@ -62,12 +68,50 @@ export function mockInvoiceSession(): CheckoutSessionPublic {
     ...mockSession,
     token: 'invoice',
     invoiceNumber: 'INV-2026-0142',
-    merchant: { name: 'Aurora Studio', accent: '#d65a84' },
+    invoice: {
+      number: 'INV-2026-0142',
+      lineItems: [
+        { description: 'Enterprise implementation — Q3', quantity: 1, amount: '500000' },
+        { description: 'Dedicated support (3 months)', quantity: 1, amount: '150000' },
+      ],
+      issuedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      from: {
+        name: 'Aurora Studio Ltd.',
+        email: 'billing@aurorastudio.io',
+        address: '14 Marine Parade, Victoria Island, Lagos, NG',
+        taxId: 'RC 1234567',
+      },
+      to: {
+        name: 'Ada Lovelace',
+        email: 'ada@lovelace.dev',
+        address: '221B Baker Street, Marylebone, London, GB',
+      },
+      note: 'Please reference INV-2026-0142 in your payment. Thank you for your business!',
+      terms: 'Net 14',
+    },
+    fiat: {
+      amount: '650000',
+      currency: 'NGN',
+      rate: '1529.41',
+      rateLabel: '₦1,529.41',
+    },
+    merchant: {
+      name: 'Aurora Studio',
+      accent: '#5D2F77',
+      branding: {
+        logoUrl: '/logo.svg',
+        accentColor: '#5D2F77',
+        supportEmail: 'billing@aurorastudio.io',
+        receiptMessage: 'Thank you — your invoice is now settled. A formal receipt follows by email.',
+      },
+    },
     product: undefined,
-    amount: '4,250.00',
+    amount: '425.00',
     currency: 'USDT',
     fee: { percent: '1.00', bearer: 'merchant' },
-    total: '4,250.00',
+    total: '425.00',
+    customerEmail: 'ada@lovelace.dev',
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     networks: [
       { currency: 'USDC', networks: [{ code: 'ethereum', label: 'Ethereum' }, { code: 'polygon', label: 'Polygon' }, { code: 'base', label: 'Base' }] },
