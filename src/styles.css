@@ -75,3 +75,10 @@ body {
 .tab-transition {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Move Sonner close button to the right */
+[data-sonner-toast] [data-close-button] {
+  left: auto !important;
+  right: -6px !important;
+  top: -6px !important;
+}

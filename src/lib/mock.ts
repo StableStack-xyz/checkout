@@ -2,6 +2,27 @@ import type { CheckoutSessionPublic, Currency, NetworkCode, PaymentAddress } fro
 
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
+export interface MockCoupon {
+  code: string
+  percentOff?: string
+  amountOff?: string
+}
+
+export const mockCoupons: MockCoupon[] = [
+  { code: 'SAVE10', percentOff: '10' },
+  { code: 'FLAT5', amountOff: '5' },
+]
+
+export function validateMockCoupon(code: string, subtotal: number): { discount: number; coupon: MockCoupon } | null {
+  const c = mockCoupons.find((x) => x.code === code.toUpperCase().trim())
+  if (!c) return null
+  const discount = Math.min(
+    c.percentOff ? (subtotal * Number(c.percentOff)) / 100 : Number(c.amountOff),
+    subtotal
+  )
+  return { discount, coupon: c }
+}
+
 const evmAddress = (seed: number) =>
   `0x${[...Array(40)].map((_, i) => '0123456789abcdef'[(seed * 7 + i * 13) % 16]).join('')}`
 const tronAddress = 'TQ8R6QnQvYYYqDqQWJkXjYh4ZQmYz9Wf6K'
@@ -34,8 +55,9 @@ export const mockSession: CheckoutSessionPublic = {
     },
   },
   product: {
-    name: 'Lumen Pro — Annual',
+    name: 'Lumen Pro, Annual',
     description: 'Full access to the Lumen Pro workspace, analytics, and priority support for 12 months.',
+    imageUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23d65a84'/%3E%3Cstop offset='1' stop-color='%233e1e68'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='96' height='96' rx='20' fill='url(%23g)'/%3E%3Ctext x='48' y='62' font-family='Arial' font-size='40' font-weight='bold' fill='white' text-anchor='middle'%3EL%3C/text%3E%3C/svg%3E",
   },
   amount: '120.00',
   currency: 'USDC',
@@ -71,7 +93,7 @@ export function mockInvoiceSession(): CheckoutSessionPublic {
     invoice: {
       number: 'INV-2026-0142',
       lineItems: [
-        { description: 'Enterprise implementation — Q3', quantity: 1, amount: '500000' },
+        { description: 'Enterprise implementation, Q3', quantity: 1, amount: '500000' },
         { description: 'Dedicated support (3 months)', quantity: 1, amount: '150000' },
       ],
       issuedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),

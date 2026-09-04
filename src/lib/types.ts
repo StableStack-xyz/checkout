@@ -58,10 +58,12 @@ export interface CheckoutSessionPublic {
     name: string
     description?: string
     imageUrl?: string
+    requiresShipping?: boolean
   }
   invoiceNumber?: string
   invoice?: InvoiceDetail
   fiat?: FiatQuote
+  collectShipping?: boolean
   amount: string
   currency: Currency
   fee: { percent: string; bearer: 'merchant' | 'customer' } | null

@@ -11,7 +11,7 @@ import { NetworkLogo } from './NetworkLogo'
 
 interface OrderSummaryPanelProps {
   session: CheckoutSessionPublic
-  totals: { total: string; feeAmount: string | null }
+  totals: { total: string; feeAmount: string | null; discountAmount?: string | null; promoCode?: string | null }
   currency: Currency
   network: NetworkCode
   address: string
@@ -276,7 +276,7 @@ function LineItems({
   currency,
 }: {
   session: CheckoutSessionPublic
-  totals: { total: string; feeAmount: string | null }
+  totals: { total: string; feeAmount: string | null; discountAmount?: string | null; promoCode?: string | null }
   currency: Currency
 }) {
   return (
@@ -318,6 +318,14 @@ function LineItems({
             <span>Platform Fee ({session.fee.percent}%)</span>
             <span className="font-semibold text-[#1a1f36]">
               {session.fee.bearer === 'customer' ? `+ ${formatAmount(totals.feeAmount ?? '0')}` : 'Included'} {currency}
+            </span>
+          </div>
+        )}
+        {totals.discountAmount && Number(totals.discountAmount) > 0 && (
+          <div className="flex justify-between text-emerald-600">
+            <span className="font-semibold">Discount{totals.promoCode ? ` (${totals.promoCode})` : ''}</span>
+            <span className="font-semibold">
+              - {formatAmount(totals.discountAmount)} {currency}
             </span>
           </div>
         )}

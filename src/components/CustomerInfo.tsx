@@ -16,7 +16,6 @@ export function CustomerInfo({
   session,
   email,
   setEmail,
-  touched,
   setTouched,
   showError,
 }: CustomerInfoProps) {

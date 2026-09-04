@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Lock, Loader2, Clock, CircleCheck, ExternalLink, Sparkles, ShieldCheck, Check, ArrowRight, RotateCcw, Copy, Radio, ArrowUpRight, AlertTriangle } from 'lucide-react'
+import { Lock, Loader2, Clock, CircleCheck, Sparkles, ShieldCheck, Check, ArrowRight, RotateCcw, Copy, AlertTriangle } from 'lucide-react'
 import { useCheckoutSession, selectNetwork } from '../lib/api'
 import { USE_MOCK, getMockAddress } from '../lib/mock'
 import { useMerchantBranding } from '../lib/branding'
@@ -9,6 +9,7 @@ import { copyToClipboard, formatAmount } from '../lib/format'
 import type { CheckoutSessionPublic, Currency, NetworkCode } from '../lib/types'
 import { CustomerInfo } from './CustomerInfo'
 import { PayPanel } from './PayPanel'
+import { PromotionCode, ShippingInfo } from './PromotionShipping'
 import { OrderSummaryPanel } from './OrderSummaryPanel'
 import { StableStackWordmark } from './Logo'
 import { NetworkLogo } from './NetworkLogo'
@@ -27,13 +28,20 @@ function useCountdown(expiresAt?: string): number {
   return new Date(expiresAt).getTime() - now
 }
 
-function totalFor(session: CheckoutSessionPublic): { total: string; feeAmount: string | null } {
+function totalsFor(
+  session: CheckoutSessionPublic,
+  discount: number
+): { subtotal: string; total: string; feeAmount: string | null; discountAmount: string | null } {
   const amount = Number(session.amount.replace(/,/g, ''))
-  if (session.fee && session.fee.bearer === 'customer') {
-    const feeAmount = (amount * Number(session.fee.percent)) / 100
-    return { total: (amount + feeAmount).toFixed(2), feeAmount: feeAmount.toFixed(2) }
+  const fee = session.fee && session.fee.bearer === 'customer' ? (amount * Number(session.fee.percent)) / 100 : 0
+  const subtotal = amount + fee
+  const capped = Math.min(discount, subtotal)
+  return {
+    subtotal: subtotal.toFixed(2),
+    total: (subtotal - capped).toFixed(2),
+    feeAmount: fee > 0 ? fee.toFixed(2) : null,
+    discountAmount: capped > 0 ? capped.toFixed(2) : null,
   }
-  return { total: amount.toFixed(2), feeAmount: null }
 }
 
 export function CheckoutPage({ token }: { token: string }) {
@@ -44,6 +52,7 @@ export function CheckoutPage({ token }: { token: string }) {
   const [flowState, setFlowState] = useState<PaymentFlowState>('idle')
   const [customerEmail, setCustomerEmail] = useState(session?.customerEmail ?? '')
   const [emailTouched, setEmailTouched] = useState(false)
+  const [promo, setPromo] = useState<{ code: string; discount: number } | null>(null)
   const [simulatedTx, setSimulatedTx] = useState<{ txHash: string; network: NetworkCode; confirmedAt: string } | null>(null)
 
   const initialized = useRef(false)
@@ -78,7 +87,11 @@ export function CheckoutPage({ token }: { token: string }) {
   const countdownExpired = session?.status === 'open' && countdownMs <= 0
 
   const status = flowState === 'paid' ? 'paid' : session?.status === 'open' && countdownExpired ? 'expired' : session?.status
-  const totals = useMemo(() => (session ? totalFor(session) : { total: '0.00', feeAmount: null }), [session])
+  const totals = useMemo(
+    () => (session ? totalsFor(session, promo?.discount ?? 0) : { subtotal: '0.00', total: '0.00', feeAmount: null, discountAmount: null }),
+    [session, promo]
+  )
+  const needsShipping = !!(session?.collectShipping || session?.product?.requiresShipping)
 
   if (isLoading) {
     return (
@@ -147,7 +160,7 @@ export function CheckoutPage({ token }: { token: string }) {
         <div className="lg:col-span-6 flex flex-col bg-[#f8f9fa]">
           <OrderSummaryPanel
             session={session}
-            totals={totals}
+            totals={{ ...totals, promoCode: promo?.code ?? null }}
             currency={currency}
             network={network}
             address={address}
@@ -184,7 +197,6 @@ export function CheckoutPage({ token }: { token: string }) {
                 </>
               ) : flowState === 'awaiting_confirmation' ? (
                 <AwaitingConfirmationCard
-                  session={session}
                   totals={totals}
                   currency={currency}
                   network={network}
@@ -216,10 +228,25 @@ export function CheckoutPage({ token }: { token: string }) {
                     onNetwork={handleNetwork}
                   />
 
+                  <div className="space-y-3">
+                    <PromotionCode
+                      subtotal={Number(totals.subtotal)}
+                      currency={currency}
+                      appliedCode={promo?.code ?? null}
+                      onApply={(code, discount) => setPromo({ code, discount })}
+                      onRemove={() => setPromo(null)}
+                    />
+                  </div>
+
+                  {needsShipping && (
+                    <ShippingInfo onChange={() => {}} />
+                  )}
+
                   <div className="space-y-3 pt-2">
                     <PayActionButton
                       amount={formatAmount(totals.total)}
                       currency={currency}
+                      hasFiatRate={!!session.fiat}
                       emailValid={emailValid}
                       onInitiate={handleInitiatePayment}
                       onInvalidEmail={() => {
@@ -265,7 +292,6 @@ export function CheckoutPage({ token }: { token: string }) {
 }
 
 function AwaitingConfirmationCard({
-  session,
   totals,
   currency,
   network,
@@ -273,7 +299,6 @@ function AwaitingConfirmationCard({
   onConfirm,
   onCancel,
 }: {
-  session: CheckoutSessionPublic
   totals: { total: string; feeAmount: string | null }
   currency: Currency
   network: NetworkCode
@@ -559,45 +584,100 @@ function FooterBranding({ supportEmail }: { supportEmail?: string }) {
   )
 }
 
+const RATE_LOCK_DURATION_MS = 90_000 // 90 seconds
+
 function PayActionButton({
   amount,
   currency,
+  hasFiatRate = false,
   emailValid,
   onInitiate,
   onInvalidEmail,
 }: {
   amount: string
   currency: Currency
+  hasFiatRate?: boolean
   emailValid: boolean
   onInitiate: () => void
   onInvalidEmail: () => void
 }) {
   const [loading, setLoading] = useState(false)
+  const [rateProgress, setRateProgress] = useState(1) // 1.0 → 0.0
+  const [refreshing, setRefreshing] = useState(false)
+  const startedAt = useRef(Date.now())
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const startTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    startedAt.current = Date.now()
+    setRateProgress(1)
+
+    timerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startedAt.current
+      const remaining = Math.max(0, 1 - elapsed / RATE_LOCK_DURATION_MS)
+      setRateProgress(remaining)
+
+      if (remaining === 0) {
+        clearInterval(timerRef.current!)
+        // Auto-refresh: disable button, simulate re-fetch, then restart
+        setRefreshing(true)
+        setTimeout(() => {
+          setRefreshing(false)
+          startTimer()
+          toast.success('Exchange rate refreshed')
+        }, 1800)
+      }
+    }, 200)
+  }
+
+  useEffect(() => {
+    if (!hasFiatRate) return
+    startTimer()
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasFiatRate])
 
   const handleClick = async () => {
+    if (refreshing) return
     if (!emailValid) {
       onInvalidEmail()
       return
     }
     if (loading) return
     setLoading(true)
-
     await new Promise((r) => setTimeout(r, 450))
     setLoading(false)
     onInitiate()
   }
 
+  const isDisabled = loading || refreshing
+
+  // pct of the button that is "filled" (brand) vs "drained" (dim brand)
+  const fillPct = hasFiatRate ? Math.round(rateProgress * 100) : 100
+  const bgStyle = hasFiatRate
+    ? {
+        background: `linear-gradient(to right, #2C1047 ${fillPct}%, #1a0b2e ${fillPct}%)`,
+        transition: 'background 0.2s linear',
+      }
+    : undefined
+
   return (
     <button
       type="button"
       onClick={handleClick}
-      disabled={loading}
-      className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl bg-[#2C1047] py-3.5 px-6 font-display text-sm font-bold text-white shadow-md btn-press hover:bg-[#3e1e68] hover:shadow-lg transition-all duration-200 disabled:opacity-90 cursor-pointer"
+      disabled={isDisabled}
+      style={bgStyle}
+      className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl bg-[#2C1047] py-3.5 px-6 font-display text-sm font-bold text-white shadow-md btn-press hover:brightness-110 transition-all duration-200 disabled:cursor-not-allowed cursor-pointer"
     >
       {loading ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin text-(--merchant-accent)" />
           <span>Processing Payment…</span>
+        </>
+      ) : refreshing ? (
+        <>
+          <RotateCcw className="h-4 w-4 animate-spin opacity-70" />
+          <span className="opacity-70">Refreshing rate…</span>
         </>
       ) : (
         <>
