@@ -11,7 +11,7 @@ function PayRoute() {
   return (
     <>
       <CheckoutPage token={token} />
-      <Toaster position="bottom-center" toastOptions={{ style: { borderRadius: '14px', background: '#2c1047', color: '#fefcf9' } }} />
+      <Toaster position="bottom-center" closeButton toastOptions={{ style: { borderRadius: '14px', background: '#2c1047', color: '#fefcf9' } }} />
     </>
   )
 }

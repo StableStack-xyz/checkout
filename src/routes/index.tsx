@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowRight, ShieldCheck, CreditCard, Sparkles, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react'
 import { StableStackWordmark } from '../components/Logo'
 
 export const Route = createFileRoute('/')({

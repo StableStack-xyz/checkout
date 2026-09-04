@@ -27,6 +27,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+
 export function formatCountdown(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))
   const m = Math.floor(total / 60)
