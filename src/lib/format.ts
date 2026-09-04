@@ -4,6 +4,15 @@ export function formatAmount(value: string | number): string {
   return clean.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+const FIAT_SYMBOLS: Record<string, string> = { NGN: '₦', KES: 'KSh ', ZAR: 'R ' }
+
+export function formatFiat(value: string | number, currency?: string): string {
+  const clean = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''))
+  if (isNaN(clean)) return '0.00'
+  const symbol = currency ? FIAT_SYMBOLS[currency] ?? `${currency} ` : ''
+  return `${symbol}${clean.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+}
+
 export function shortAddress(address: string, head = 6, tail = 6): string {
   if (address.length <= head + tail + 3) return address
   return `${address.slice(0, head)}…${address.slice(-tail)}`
