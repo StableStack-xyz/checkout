@@ -1,8 +1,14 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react'
 import { StableStackWordmark } from '../components/Logo'
+import { USE_MOCK } from '../lib/mock'
 
 export const Route = createFileRoute('/')({
+  // The demo index only exists for mock previews. In live mode there is
+  // no session to show here, so fall through to the 404 page.
+  beforeLoad: () => {
+    if (!USE_MOCK) throw redirect({ to: '/404' })
+  },
   component: PreviewIndex,
 })
 
